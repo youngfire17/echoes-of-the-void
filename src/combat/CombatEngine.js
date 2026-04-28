@@ -2,6 +2,7 @@
 import { calculateDamage } from './DamageCalculator'
 import { moveEnemyTowardHero, tickEnemyAttack } from './EnemyAI'
 import { buildSpawnQueue } from './WaveSpawner'
+import { ZONES } from '../data/zones'
 import { generateLoot } from '../systems/LootGenerator'
 import { distance } from '../utils'
 
@@ -54,6 +55,7 @@ export class CombatEngine {
 
   _loadWave() {
     this.spawnQueue = buildSpawnQueue(this.zone, this.wave)
+      .sort((a, b) => a.spawnDelay - b.spawnDelay)
     this.spawnTimer = 0
     this.enemies = []
     this.phase = 'wave'
@@ -66,7 +68,8 @@ export class CombatEngine {
       this.betweenWaveTimer -= dt
       if (this.betweenWaveTimer <= 0) {
         this.wave++
-        if (this.wave > 10) {
+        const zoneWaveCount = ZONES[this.zone]?.waves.length ?? 10
+        if (this.wave > zoneWaveCount) {
           this.phase = 'ended'
           this._emit('run_complete', {})
           return
@@ -107,7 +110,9 @@ export class CombatEngine {
     })
 
     // Enemy movement and attacks
-    for (const enemy of this.enemies) {
+    const activeEnemies = [...this.enemies]
+    for (const enemy of activeEnemies) {
+      if (enemy.currentHp <= 0) continue
       moveEnemyTowardHero(enemy, HERO_X, HERO_Y, dt)
       tickEnemyAttack(enemy, HERO_X, HERO_Y, dt, (dmg) => {
         this._heroTakeHit(dmg, enemy)
@@ -129,7 +134,7 @@ export class CombatEngine {
     }
 
     // Wave cleared check
-    if (this.spawnQueue.length === 0 && this.enemies.length === 0) {
+    if (this.phase === 'wave' && this.spawnQueue.length === 0 && this.enemies.length === 0) {
       this.phase = 'between'
       this.betweenWaveTimer = 10
       this._emit('wave_cleared', { wave: this.wave, zone: this.zone })
@@ -191,6 +196,7 @@ export class CombatEngine {
   }
 
   _heroTakeHit(rawDmg, enemy) {
+    if (this.phase === 'ended') return  // hero already dead, ignore subsequent hits this tick
     let dmg = rawDmg
     const reduction = this.heroStats.damageReduction || 0
     dmg = Math.max(1, Math.round(dmg * (1 - reduction)))
