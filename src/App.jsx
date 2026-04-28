@@ -24,7 +24,7 @@ export default function App() {
     if (!saved) return
 
     // Restore player store
-    if (saved.echoes) usePlayerStore.getState().addEchoes(saved.echoes)
+    if (typeof saved.echoes === 'number') usePlayerStore.setState({ echoes: saved.echoes })
     if (saved.equippedGear) {
       Object.entries(saved.equippedGear).forEach(([slot, item]) => {
         if (item) usePlayerStore.getState().equipItem(item)
@@ -37,6 +37,9 @@ export default function App() {
     // Restore inventory
     if (saved.inventory) {
       saved.inventory.forEach(item => useInventoryStore.getState().addItem(item))
+    }
+    if (saved.stash) {
+      useInventoryStore.setState({ stash: saved.stash })
     }
 
     // Restore meta store state by reconstructing the arrays
@@ -131,7 +134,7 @@ export default function App() {
             Cleared {offlineReward.wavesCleared} waves while away
           </div>
           <div className="text-yellow-300">
-            +{offlineReward.echoes} Echoes · +{offlineReward.gold} Gold
+            +{offlineReward.echoes} Echoes
           </div>
           <button
             onClick={() => setOfflineReward(null)}
