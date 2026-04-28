@@ -219,6 +219,14 @@ export class CombatEngine {
       if (enemy.currentHp <= 0) this._killEnemy(enemy)
     }
 
+    // thorns affix effect
+    const thorns = this.heroStats.thorns
+    if (thorns && thorns > 0 && enemy.currentHp > 0) {
+      enemy.currentHp -= thorns
+      this._emit('floating_number', { x: enemy.x, y: enemy.y, value: thorns, isCrit: false })
+      if (enemy.currentHp <= 0) this._killEnemy(enemy)
+    }
+
     if (this.heroHp <= 0) {
       this.heroHp = 0
       this.phase = 'ended'
@@ -233,6 +241,13 @@ export class CombatEngine {
     if (Math.random() < enemy.lootChance) {
       const item = generateLoot(this.zone, enemy.archetype)
       this.lootTimers.push({ item, timer: 2.0 })
+    }
+
+    // on_kill_heal affix effect
+    const healOnKill = this.heroStats.onKillHeal
+    if (healOnKill && healOnKill > 0) {
+      this.heroHp = Math.min(this.heroMaxHp, this.heroHp + healOnKill)
+      this._emit('floating_number', { x: HERO_X, y: HERO_Y - 30, value: healOnKill, isCrit: false })
     }
   }
 

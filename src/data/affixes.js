@@ -9,12 +9,12 @@ export const AFFIXES = [
   { id: 'hp_regen',         tag: 'physical', stat: 'hpRegenFlat',         label: '+{v} HP Regen/sec',        valueRange: [1, 5],   slots: ['chest', 'ring', 'amulet', 'offhand'], minRarity: 0 },
   { id: 'armor',            tag: 'physical', stat: 'armorFlat',           label: '+{v} Armor',               valueRange: [5, 18],  slots: ['helm', 'chest', 'offhand'],  minRarity: 0 },
   { id: 'damage_reduction', tag: 'physical', stat: 'damageReductionPct',  label: '+{v}% Damage Reduction',   valueRange: [2, 7],   slots: ['chest', 'offhand'],          minRarity: 1 },
-  { id: 'on_kill_heal',     tag: 'physical', stat: null,                  label: 'Kill: Restore {v} HP',     valueRange: [2, 8],   slots: ['weapon', 'ring'],            minRarity: 1, effectType: 'on_kill_heal' },
+  { id: 'on_kill_heal',     tag: 'physical', stat: 'onKillHeal',           label: 'Kill: Restore {v} HP',     valueRange: [2, 8],   slots: ['weapon', 'ring'],            minRarity: 1, effectType: 'on_kill_heal' },
   { id: 'cooldown_reduction', tag: 'arcane', stat: 'cooldownReductionPct',label: '-{v}% Cooldowns',          valueRange: [5, 15],  slots: ['helm', 'ring', 'amulet'],    minRarity: 1 },
   { id: 'ability_damage',   tag: 'arcane',   stat: 'abilityDamagePct',    label: '+{v}% Ability Damage',     valueRange: [8, 20],  slots: ['weapon', 'ring', 'amulet'],  minRarity: 1 },
   { id: 'strength_bonus',   tag: 'physical', stat: 'strengthFlat',        label: '+{v} Strength',            valueRange: [2, 6],   slots: ['helm', 'chest', 'amulet'],   minRarity: 0 },
   { id: 'vitality_bonus',   tag: 'physical', stat: 'vitalityFlat',        label: '+{v} Vitality',            valueRange: [2, 6],   slots: ['helm', 'chest', 'ring'],     minRarity: 0 },
-  { id: 'thorns',           tag: 'physical', stat: null,                  label: 'Return {v} damage when hit', valueRange: [3, 10], slots: ['chest', 'offhand'],          minRarity: 2, effectType: 'thorns' },
+  { id: 'thorns',           tag: 'physical', stat: 'thorns',              label: 'Return {v} damage when hit', valueRange: [3, 10], slots: ['chest', 'offhand'],          minRarity: 2, effectType: 'thorns' },
 ]
 
 export const RARITY_AFFIX_COUNT = {

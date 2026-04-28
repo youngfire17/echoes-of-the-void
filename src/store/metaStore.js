@@ -18,7 +18,7 @@ export const useMetaStore = create((set, get) => ({
   unlockedZones: [1],
   automationSettings: {
     autoEquip: true,
-    autoSell: true,
+    autoSell: false,
     autoAbilities: false,
   },
   lastOfflineTimestamp: null,
