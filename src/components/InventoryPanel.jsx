@@ -36,11 +36,11 @@ export function InventoryPanel() {
 
   const handleEquipFromInventory = (item) => {
     const currentlyEquipped = equippedGear[item.slot]
+    removeItem(item.id)
     if (currentlyEquipped) {
       useInventoryStore.getState().addItem(currentlyEquipped)
     }
     equipItem(item)
-    removeItem(item.id)
   }
 
   const handleUnequip = (slot) => {

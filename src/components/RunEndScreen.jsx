@@ -1,6 +1,6 @@
 // src/components/RunEndScreen.jsx
 export function RunEndScreen({ result, onReturn }) {
-  const { reason, echoesEarned, goldEarned, wave } = result
+  const { reason, echoesEarned = 0, goldEarned = 0, wave = 1 } = result
   const isVictory = reason === 'victory'
 
   return (
