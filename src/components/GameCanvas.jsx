@@ -38,23 +38,17 @@ export function GameCanvas({ onRunEnd }) {
     // Wire engine events
     engine.on('hero_died', () => {
       const snap = engine.getSnapshot()
+      const { echoesEarned, goldEarned } = useRunStore.getState()
+      usePlayerStore.getState().addEchoes(echoesEarned)
       runStore.endRun()
-      onRunEnd({
-        reason: 'death',
-        echoesEarned: runStore.echoesEarned,
-        goldEarned: runStore.goldEarned,
-        wave: snap.wave,
-      })
+      onRunEnd({ reason: 'death', echoesEarned, goldEarned, wave: snap.wave })
     })
 
     engine.on('run_complete', () => {
+      const { echoesEarned, goldEarned } = useRunStore.getState()
+      usePlayerStore.getState().addEchoes(echoesEarned)
       runStore.endRun()
-      onRunEnd({
-        reason: 'victory',
-        echoesEarned: runStore.echoesEarned,
-        goldEarned: runStore.goldEarned,
-        wave: 10,
-      })
+      onRunEnd({ reason: 'victory', echoesEarned, goldEarned, wave: 10 })
     })
 
     engine.on('wave_cleared', ({ wave }) => {
@@ -87,8 +81,10 @@ export function GameCanvas({ onRunEnd }) {
 
     const loop = new GameLoop(
       (dt) => {
-        if (!isPausedRef.current) engine.tick(dt)
-        setSnapshot({ ...engine.getSnapshot() })
+        if (!isPausedRef.current) {
+          engine.tick(dt)
+          setSnapshot({ ...engine.getSnapshot() })
+        }
       },
       () => {
         const snap = engine.getSnapshot()

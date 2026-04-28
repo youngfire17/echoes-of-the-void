@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { save, load, clearSave } from '../src/systems/SaveManager'
+import { save, load, clearSave, SAVE_VERSION } from '../src/systems/SaveManager'
 
 // Mock localStorage for tests
 const localStorageMock = (() => {
@@ -17,7 +17,7 @@ describe('SaveManager', () => {
   beforeEach(() => localStorage.clear())
 
   it('saved state can be loaded back as equal object', () => {
-    const state = { echoes: 42, items: [{ id: 'item_1', slot: 'weapon' }] }
+    const state = { version: SAVE_VERSION, echoes: 42, items: [{ id: 'item_1', slot: 'weapon' }] }
     save(state)
     const loaded = load()
     expect(loaded).toEqual(state)

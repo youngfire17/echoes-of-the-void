@@ -1,5 +1,7 @@
 const SAVE_KEY = 'echoes_of_the_void_save'
 
+export const SAVE_VERSION = 1
+
 export function save(state) {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(state))
@@ -12,7 +14,13 @@ export function load() {
   try {
     const raw = localStorage.getItem(SAVE_KEY)
     if (!raw) return null
-    return JSON.parse(raw)
+    const data = JSON.parse(raw)
+    if (typeof data !== 'object' || data === null || data.version !== SAVE_VERSION) {
+      console.warn('Save version mismatch or invalid, clearing save')
+      clearSave()
+      return null
+    }
+    return data
   } catch (e) {
     console.error('Load failed, clearing corrupted save:', e)
     clearSave()
@@ -26,6 +34,7 @@ export function clearSave() {
 
 export function buildSaveState(playerStore, inventoryStore, metaStore) {
   return {
+    version: SAVE_VERSION,
     classId: playerStore.classId,
     echoes: playerStore.echoes,
     equippedGear: playerStore.equippedGear,
