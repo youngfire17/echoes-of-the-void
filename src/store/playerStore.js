@@ -49,7 +49,7 @@ function buildDerivedStats(baseStats, equippedGear, passiveSkills, vaultBonuses 
   if (stats.critChanceFlat) stats.critChance = (stats.critChance || 0) + stats.critChanceFlat / 100
   if (stats.critDamagePct) stats.critDamage = (stats.critDamage || 0) + stats.critDamagePct / 100
   if (stats.cooldownReductionPct) stats.cooldownReduction = (stats.cooldownReductionPct || 0) / 100
-  if (stats.damageReductionPct) stats.damageReduction = (stats.damageReduction || 0) + stats.damageReductionPct / 100
+  if (stats.damageReductionPct) stats.damageReduction = stats.damageReductionPct / 100
 
   return stats
 }
