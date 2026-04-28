@@ -50,4 +50,10 @@ describe('buildSpawnQueue', () => {
       expect(enemy).toHaveProperty('spawnDelay')
     }
   })
+
+  it('boss wave bossId exists in ENEMIES data', () => {
+    const config = getWaveConfig(1, 10)
+    expect(config.isBoss).toBe(true)
+    expect(ENEMIES).toHaveProperty(config.bossId)
+  })
 })
