@@ -56,7 +56,7 @@ export const SKILLS = {
     type: 'passive',
     description: '+12% damage reduction.',
     tags: ['holy'],
-    effect: { type: 'stat_bonus', stat: 'damageReduction', flat: 0.12 },
+    effect: { type: 'stat_bonus', stat: 'damageReductionPct', flat: 12 },
   },
   battle_hardened: {
     id: 'battle_hardened',

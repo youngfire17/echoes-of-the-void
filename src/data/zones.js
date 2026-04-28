@@ -15,7 +15,7 @@ export const ZONES = {
       { enemies: [{ id: 'skeleton', count: 10 }, { id: 'zombie', count: 2 }], hasElite: true, eliteId: 'skeleton_knight', isBoss: false },
       { enemies: [{ id: 'ghoul', count: 5 }, { id: 'bone_archer', count: 4 }, { id: 'zombie', count: 2 }], hasElite: true, eliteId: 'skeleton_knight', isBoss: false },
       { enemies: [{ id: 'skeleton', count: 12 }, { id: 'ghoul', count: 4 }, { id: 'bone_archer', count: 3 }], hasElite: true, eliteId: 'skeleton_knight', isBoss: false },
-      { enemies: [{ id: 'lich_lord', count: 1 }], hasElite: false, isBoss: true },
+      { enemies: [], hasElite: false, isBoss: true, bossId: 'lich_lord' },
     ],
   },
 }
