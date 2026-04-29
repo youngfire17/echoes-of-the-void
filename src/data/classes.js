@@ -14,6 +14,7 @@ export const CLASSES = {
       vitality: 14,
       attackSpeed: 1.2,
       attackRange: 65,
+      moveSpeed: 120,
       damageFlat: 8,
       critChance: 0.05,
       critDamage: 0.5,
