@@ -205,8 +205,10 @@ export class CombatEngine {
       .filter(r => r && r.state === 'locked')
 
     if (unclearedNeighbors.length === 0) {
-      const uncleared = layout.rooms.find(r => r.state === 'locked')
-      if (!uncleared) {
+      // BFS to find next step toward nearest uncleared room
+      const nextStepId = this._findNextStepToUncleared()
+      if (!nextStepId) {
+        // All rooms on this floor are cleared
         const nextFloorIndex = this.currentFloorIndex + 1
         if (nextFloorIndex < this.floorLayouts.length) {
           this._enterFloor(nextFloorIndex)
@@ -216,9 +218,10 @@ export class CombatEngine {
         }
         return
       }
-      this.pendingRoomId = uncleared.id
-      this.heroMoveTargetX = uncleared.x + uncleared.width / 2
-      this.heroMoveTargetY = uncleared.y + uncleared.height / 2
+      const nextRoom = layout.rooms.find(r => r.id === nextStepId)
+      this.pendingRoomId = nextStepId
+      this.heroMoveTargetX = nextRoom.x + nextRoom.width / 2
+      this.heroMoveTargetY = nextRoom.y + nextRoom.height / 2
       return
     }
 
@@ -246,8 +249,9 @@ export class CombatEngine {
       this.heroMoveTargetY = null
 
       if (this.pendingRoomId) {
-        this._activateRoom(this.pendingRoomId)
-        this.pendingRoomId = null
+        const roomToActivate = this.pendingRoomId
+        this.pendingRoomId = null  // clear FIRST, before _activateRoom sets a new one
+        this._activateRoom(roomToActivate)
       }
     } else {
       const step = speed * dt
@@ -256,9 +260,44 @@ export class CombatEngine {
     }
   }
 
+  _findNextStepToUncleared() {
+    const layout = this.floorLayouts[this.currentFloorIndex]
+    const roomMap = Object.fromEntries(layout.rooms.map(r => [r.id, r]))
+
+    // BFS from current room to find nearest locked room
+    const queue = [[this.currentRoomId, []]]
+    const visited = new Set([this.currentRoomId])
+
+    while (queue.length > 0) {
+      const [roomId, path] = queue.shift()
+      const room = roomMap[roomId]
+
+      if (room.state === 'locked') {
+        // Return the first step in the path (the adjacent room to walk to next)
+        return path[0] ?? roomId
+      }
+
+      for (const neighborId of room.neighborIds) {
+        if (!visited.has(neighborId)) {
+          visited.add(neighborId)
+          queue.push([neighborId, path.length === 0 ? [neighborId] : [...path, neighborId]])
+        }
+      }
+    }
+    return null  // no uncleared rooms
+  }
+
   _activateRoom(roomId) {
     const layout = this.floorLayouts[this.currentFloorIndex]
     const room = layout.rooms.find(r => r.id === roomId)
+
+    // Passing through a cleared room during backtracking — just update position and keep moving
+    if (room.state === 'cleared') {
+      this.currentRoomId = roomId
+      this._walkToNextRoom()
+      return
+    }
+
     room.state = 'active'
     this.currentRoomId = roomId
 
