@@ -1,15 +1,14 @@
 // src/combat/CombatEngine.js
 import { calculateDamage } from './DamageCalculator'
 import { moveEnemyTowardHero, tickEnemyAttack } from './EnemyAI'
-import { buildSpawnQueue } from './WaveSpawner'
-import { ZONES } from '../data/zones'
+import { generateFloor } from './DungeonGenerator'
+import { populateRoom } from './RoomSpawner'
 import { generateLoot } from '../systems/LootGenerator'
 import { distance } from '../utils'
+import { ZONES } from '../data/zones'
 
-const ARENA_W = 800
-const ARENA_H = 500
-const HERO_X = ARENA_W / 2
-const HERO_Y = ARENA_H / 2
+const VIEWPORT_W = 800
+const VIEWPORT_H = 500
 
 export class CombatEngine {
   constructor() {
@@ -17,20 +16,29 @@ export class CombatEngine {
   }
 
   reset() {
-    this.enemies = []
-    this.spawnQueue = []
-    this.spawnTimer = 0
+    this.floorLayouts = []
+    this.currentFloorIndex = 0
+    this.currentRoomId = null
+    this.pendingRoomId = null
+    this.zoneId = 1
+
+    this.heroX = 0
+    this.heroY = 0
+    this.heroMoveTargetX = null
+    this.heroMoveTargetY = null
+
     this.heroHp = 0
     this.heroMaxHp = 0
     this.heroStats = {}
     this.heroAttackTimer = 0
-    this.wave = 1
-    this.zone = 1
-    this.phase = 'idle'    // 'idle' | 'wave' | 'between' | 'ended'
-    this.betweenWaveTimer = 0
-    this.shield = null      // { remaining: number, duration: number }
-    this.skillCooldowns = {} // skillId → seconds remaining
-    this.lootTimers = []    // { item, timer }
+
+    this.enemies = []
+    this.shield = null
+    this.skillCooldowns = {}
+    this.lootTimers = []
+    this.lootOnFloor = []
+
+    this.phase = 'idle'
     this.callbacks = {}
   }
 
@@ -42,102 +50,53 @@ export class CombatEngine {
     if (this.callbacks[event]) this.callbacks[event](data)
   }
 
-  startRun(heroStats, zone = 1) {
+  startRun(heroStats, zoneId = 1) {
     this.reset()
+    this.zoneId = zoneId
     this.heroStats = { ...heroStats }
     this.heroHp = heroStats.maxHp
     this.heroMaxHp = heroStats.maxHp
-    this.zone = zone
-    this.wave = 1
-    this.phase = 'wave'
-    this._loadWave()
-  }
 
-  _loadWave() {
-    this.spawnQueue = buildSpawnQueue(this.zone, this.wave)
-      .sort((a, b) => a.spawnDelay - b.spawnDelay)
-    this.spawnTimer = 0
-    this.enemies = []
-    this.phase = 'wave'
+    const zone = ZONES[zoneId]
+
+    for (let i = 0; i < zone.floors; i++) {
+      const layout = generateFloor(i + 1, zone.floors)
+      layout.rooms = layout.rooms.map(r => populateRoom(r, zone))
+      this.floorLayouts.push(layout)
+    }
+
+    this._enterFloor(0)
   }
 
   tick(dt) {
     if (this.phase === 'idle' || this.phase === 'ended') return
 
-    if (this.phase === 'between') {
-      this.betweenWaveTimer -= dt
-      if (this.betweenWaveTimer <= 0) {
-        this.wave++
-        const zoneWaveCount = ZONES[this.zone]?.waves.length ?? 10
-        if (this.wave > zoneWaveCount) {
-          this.phase = 'ended'
-          this._emit('run_complete', {})
-          return
-        }
-        this._loadWave()
-      }
-      return
-    }
-
-    // Tick skill cooldowns
     for (const skillId of Object.keys(this.skillCooldowns)) {
       this.skillCooldowns[skillId] = Math.max(0, this.skillCooldowns[skillId] - dt)
     }
 
-    // Tick shield duration
     if (this.shield) {
       this.shield.duration -= dt
       if (this.shield.duration <= 0) this.shield = null
     }
 
-    // Spawn queued enemies
-    this.spawnTimer += dt
-    while (this.spawnQueue.length > 0 && this.spawnQueue[0].spawnDelay <= this.spawnTimer) {
-      const enemy = this.spawnQueue.shift()
-      enemy.x = this._randomEdgeX()
-      enemy.y = this._randomEdgeY()
-      this.enemies.push(enemy)
-    }
-
-    // Tick loot pickup timers
     this.lootTimers = this.lootTimers.filter(lt => {
       lt.timer -= dt
       if (lt.timer <= 0) {
+        this.lootOnFloor = this.lootOnFloor.filter(l => l !== lt.floorRef)
         this._emit('loot_drop', lt.item)
         return false
       }
       return true
     })
 
-    // Enemy movement and attacks
-    const activeEnemies = [...this.enemies]
-    for (const enemy of activeEnemies) {
-      if (enemy.currentHp <= 0) continue
-      moveEnemyTowardHero(enemy, HERO_X, HERO_Y, dt)
-      tickEnemyAttack(enemy, HERO_X, HERO_Y, dt, (dmg) => {
-        this._heroTakeHit(dmg, enemy)
-      })
-    }
-
-    // Hero auto-attack
-    this.heroAttackTimer += dt
-    const attackInterval = 1 / (this.heroStats.attackSpeed || 1)
-    if (this.heroAttackTimer >= attackInterval) {
-      this.heroAttackTimer -= attackInterval
-      this._heroAutoAttack()
-    }
-
-    // HP regen
     const regen = this.heroStats.hpRegenFlat || 0
-    if (regen > 0) {
-      this.heroHp = Math.min(this.heroMaxHp, this.heroHp + regen * dt)
-    }
+    if (regen > 0) this.heroHp = Math.min(this.heroMaxHp, this.heroHp + regen * dt)
 
-    // Wave cleared check
-    if (this.phase === 'wave' && this.spawnQueue.length === 0 && this.enemies.length === 0) {
-      this.phase = 'between'
-      this.betweenWaveTimer = 10
-      this._emit('wave_cleared', { wave: this.wave, zone: this.zone })
+    if (this.phase === 'exploring') {
+      this._tickExploring(dt)
+    } else if (this.phase === 'fighting') {
+      this._tickFighting(dt)
     }
   }
 
@@ -161,12 +120,12 @@ export class CombatEngine {
     if (effect.type === 'heal_self') {
       const heal = Math.round(this.heroMaxHp * effect.hpPercent)
       this.heroHp = Math.min(this.heroMaxHp, this.heroHp + heal)
-      this._emit('floating_number', { x: HERO_X, y: HERO_Y - 30, value: heal, isCrit: false })
+      this._emit('floating_number', { x: this.heroX, y: this.heroY - 30, value: heal, isCrit: false })
     }
 
     if (effect.type === 'damage_aoe') {
       for (const enemy of [...this.enemies]) {
-        const dist = distance({ x: HERO_X, y: HERO_Y }, { x: enemy.x, y: enemy.y })
+        const dist = distance({ x: this.heroX, y: this.heroY }, { x: enemy.x, y: enemy.y })
         if (dist <= effect.radius) {
           const { damage, isCrit } = calculateDamage(this.heroStats, enemy.stats, true)
           const finalDmg = Math.round(damage * effect.multiplier)
@@ -183,10 +142,199 @@ export class CombatEngine {
     }
   }
 
+  getSnapshot() {
+    const layout = this.floorLayouts[this.currentFloorIndex]
+    const totalRooms = layout?.rooms.length ?? 0
+    const clearedRooms = layout?.rooms.filter(r => r.state === 'cleared').length ?? 0
+
+    let maxX = VIEWPORT_W, maxY = VIEWPORT_H
+    if (layout) {
+      for (const r of layout.rooms) {
+        maxX = Math.max(maxX, r.x + r.width + 100)
+        maxY = Math.max(maxY, r.y + r.height + 100)
+      }
+    }
+
+    return {
+      enemies: this.enemies,
+      heroX: this.heroX,
+      heroY: this.heroY,
+      heroHpPct: this.heroMaxHp > 0 ? this.heroHp / this.heroMaxHp : 1,
+      heroHp: Math.ceil(this.heroHp),
+      heroMaxHp: this.heroMaxHp,
+      isPaused: false,
+      shield: this.shield,
+      phase: this.phase,
+      floor: this.currentFloorIndex + 1,
+      totalFloors: this.floorLayouts.length,
+      totalRooms,
+      clearedRooms,
+      currentRoomId: this.currentRoomId,
+      floorLayout: layout ?? null,
+      lootOnFloor: [...this.lootOnFloor],
+      skillCooldowns: { ...this.skillCooldowns },
+      dungeonBounds: { width: maxX, height: maxY },
+      zoneName: ZONES[this.zoneId]?.name ?? `Zone ${this.zoneId}`,
+    }
+  }
+
+  _enterFloor(floorIndex) {
+    this.currentFloorIndex = floorIndex
+    this.enemies = []
+    const layout = this.floorLayouts[floorIndex]
+    const startRoom = layout.rooms.find(r => r.id === layout.startRoomId)
+    startRoom.state = 'active'
+    this.currentRoomId = startRoom.id
+    this.heroX = startRoom.x + startRoom.width / 2
+    this.heroY = startRoom.y + startRoom.height / 2
+    this.phase = 'exploring'
+    this._walkToNextRoom()
+  }
+
+  _getCurrentRoom() {
+    const layout = this.floorLayouts[this.currentFloorIndex]
+    return layout.rooms.find(r => r.id === this.currentRoomId)
+  }
+
+  _walkToNextRoom() {
+    const layout = this.floorLayouts[this.currentFloorIndex]
+    const currentRoom = this._getCurrentRoom()
+
+    const unclearedNeighbors = currentRoom.neighborIds
+      .map(id => layout.rooms.find(r => r.id === id))
+      .filter(r => r && r.state === 'locked')
+
+    if (unclearedNeighbors.length === 0) {
+      const uncleared = layout.rooms.find(r => r.state === 'locked')
+      if (!uncleared) {
+        const nextFloorIndex = this.currentFloorIndex + 1
+        if (nextFloorIndex < this.floorLayouts.length) {
+          this._enterFloor(nextFloorIndex)
+        } else {
+          this.phase = 'ended'
+          this._emit('run_complete', {})
+        }
+        return
+      }
+      this.pendingRoomId = uncleared.id
+      this.heroMoveTargetX = uncleared.x + uncleared.width / 2
+      this.heroMoveTargetY = uncleared.y + uncleared.height / 2
+      return
+    }
+
+    const priority = ['chest', 'elite', 'standard', 'empty', 'boss']
+    unclearedNeighbors.sort((a, b) => priority.indexOf(a.type) - priority.indexOf(b.type))
+    const next = unclearedNeighbors[0]
+
+    this.pendingRoomId = next.id
+    this.heroMoveTargetX = next.x + next.width / 2
+    this.heroMoveTargetY = next.y + next.height / 2
+  }
+
+  _tickExploring(dt) {
+    if (this.heroMoveTargetX === null) return
+
+    const dx = this.heroMoveTargetX - this.heroX
+    const dy = this.heroMoveTargetY - this.heroY
+    const dist = Math.sqrt(dx * dx + dy * dy)
+    const speed = this.heroStats.moveSpeed || 120
+
+    if (dist < 8) {
+      this.heroX = this.heroMoveTargetX
+      this.heroY = this.heroMoveTargetY
+      this.heroMoveTargetX = null
+      this.heroMoveTargetY = null
+
+      if (this.pendingRoomId) {
+        this._activateRoom(this.pendingRoomId)
+        this.pendingRoomId = null
+      }
+    } else {
+      const step = speed * dt
+      this.heroX += (dx / dist) * step
+      this.heroY += (dy / dist) * step
+    }
+  }
+
+  _activateRoom(roomId) {
+    const layout = this.floorLayouts[this.currentFloorIndex]
+    const room = layout.rooms.find(r => r.id === roomId)
+    room.state = 'active'
+    this.currentRoomId = roomId
+
+    if (room.enemyPack.length === 0) {
+      if (room.type === 'chest') {
+        const item = generateLoot(this.zoneId, 'normal', 'uncommon')
+        const floorRef = { x: room.x + room.width / 2, y: room.y + room.height / 2, rarity: item.rarity }
+        this.lootOnFloor.push(floorRef)
+        this.lootTimers.push({ item, timer: 2.0, floorRef })
+      }
+      room.state = 'cleared'
+      this._emit('room_cleared', { roomId })
+      this._walkToNextRoom()
+      return
+    }
+
+    for (const enemy of room.enemyPack) {
+      enemy.x = room.x + 30 + Math.random() * (room.width - 60)
+      enemy.y = room.y + 30 + Math.random() * (room.height - 60)
+      this.enemies.push(enemy)
+    }
+
+    this.phase = 'fighting'
+  }
+
+  _tickFighting(dt) {
+    const target = this._findNearestEnemy()
+    if (target) {
+      const dist = distance({ x: this.heroX, y: this.heroY }, { x: target.x, y: target.y })
+      const attackRange = this.heroStats.attackRange || 65
+      if (dist > attackRange) {
+        const dx = target.x - this.heroX
+        const dy = target.y - this.heroY
+        const speed = this.heroStats.moveSpeed || 120
+        const step = Math.min(speed * dt, dist - attackRange)
+        this.heroX += (dx / dist) * step
+        this.heroY += (dy / dist) * step
+      }
+    }
+
+    const activeEnemies = [...this.enemies]
+    for (const enemy of activeEnemies) {
+      if (enemy.currentHp <= 0) continue
+      moveEnemyTowardHero(enemy, this.heroX, this.heroY, dt)
+      tickEnemyAttack(enemy, this.heroX, this.heroY, dt, (dmg) => {
+        this._heroTakeHit(dmg, enemy)
+      })
+    }
+
+    this.heroAttackTimer += dt
+    const attackInterval = 1 / (this.heroStats.attackSpeed || 1)
+    if (this.heroAttackTimer >= attackInterval) {
+      this.heroAttackTimer -= attackInterval
+      this._heroAutoAttack()
+    }
+
+    if (this.enemies.length === 0 && this.phase === 'fighting') {
+      const room = this._getCurrentRoom()
+      room.state = 'cleared'
+      this._emit('room_cleared', { roomId: room.id })
+
+      if (room.type === 'boss') {
+        this.phase = 'ended'
+        this._emit('run_complete', {})
+        return
+      }
+
+      this.phase = 'exploring'
+      this._walkToNextRoom()
+    }
+  }
+
   _heroAutoAttack() {
     const target = this._findNearestEnemy()
     if (!target) return
-    const dist = distance({ x: HERO_X, y: HERO_Y }, { x: target.x, y: target.y })
+    const dist = distance({ x: this.heroX, y: this.heroY }, { x: target.x, y: target.y })
     if (dist > (this.heroStats.attackRange || 65)) return
 
     const { damage, isCrit } = calculateDamage(this.heroStats, target.stats)
@@ -196,7 +344,8 @@ export class CombatEngine {
   }
 
   _heroTakeHit(rawDmg, enemy) {
-    if (this.phase === 'ended') return  // hero already dead, ignore subsequent hits this tick
+    if (this.phase === 'ended') return
+
     let dmg = rawDmg
     const reduction = this.heroStats.damageReduction || 0
     dmg = Math.max(1, Math.round(dmg * (1 - reduction)))
@@ -211,19 +360,10 @@ export class CombatEngine {
     this.heroHp -= dmg
     this._emit('hero_damaged', { damage: dmg })
 
-    // Retribution passive
     if (this.heroStats.retribution && Math.random() < this.heroStats.retribution.chance) {
       const reflected = Math.round(rawDmg * this.heroStats.retribution.multiplier)
       enemy.currentHp -= reflected
       this._emit('floating_number', { x: enemy.x, y: enemy.y, value: reflected, isCrit: false })
-      if (enemy.currentHp <= 0) this._killEnemy(enemy)
-    }
-
-    // thorns affix effect
-    const thorns = this.heroStats.thorns
-    if (thorns && thorns > 0 && enemy.currentHp > 0) {
-      enemy.currentHp -= thorns
-      this._emit('floating_number', { x: enemy.x, y: enemy.y, value: thorns, isCrit: false })
       if (enemy.currentHp <= 0) this._killEnemy(enemy)
     }
 
@@ -238,16 +378,17 @@ export class CombatEngine {
     this.enemies = this.enemies.filter(e => e.instanceId !== enemy.instanceId)
     this._emit('enemy_killed', { enemy })
 
-    if (Math.random() < enemy.lootChance) {
-      const item = generateLoot(this.zone, enemy.archetype)
-      this.lootTimers.push({ item, timer: 2.0 })
+    const onKillHeal = this.heroStats.onKillHeal
+    if (onKillHeal && onKillHeal > 0) {
+      this.heroHp = Math.min(this.heroMaxHp, this.heroHp + onKillHeal)
+      this._emit('floating_number', { x: this.heroX, y: this.heroY - 30, value: onKillHeal, isCrit: false })
     }
 
-    // on_kill_heal affix effect
-    const healOnKill = this.heroStats.onKillHeal
-    if (healOnKill && healOnKill > 0) {
-      this.heroHp = Math.min(this.heroMaxHp, this.heroHp + healOnKill)
-      this._emit('floating_number', { x: HERO_X, y: HERO_Y - 30, value: healOnKill, isCrit: false })
+    if (Math.random() < enemy.lootChance) {
+      const item = generateLoot(this.zoneId, enemy.archetype)
+      const floorRef = { x: enemy.x, y: enemy.y, rarity: item.rarity }
+      this.lootOnFloor.push(floorRef)
+      this.lootTimers.push({ item, timer: 2.0, floorRef })
     }
   }
 
@@ -256,41 +397,9 @@ export class CombatEngine {
     let nearest = null
     let minDist = Infinity
     for (const e of this.enemies) {
-      const d = distance({ x: HERO_X, y: HERO_Y }, { x: e.x, y: e.y })
+      const d = distance({ x: this.heroX, y: this.heroY }, { x: e.x, y: e.y })
       if (d < minDist) { minDist = d; nearest = e }
     }
     return nearest
-  }
-
-  _randomEdgeX() {
-    const edge = Math.floor(Math.random() * 4)
-    if (edge === 0 || edge === 1) return Math.random() * ARENA_W
-    if (edge === 2) return 0
-    return ARENA_W
-  }
-
-  _randomEdgeY() {
-    const edge = Math.floor(Math.random() * 4)
-    if (edge === 0) return 0
-    if (edge === 1) return ARENA_H
-    return Math.random() * ARENA_H
-  }
-
-  getSnapshot() {
-    return {
-      enemies: this.enemies,
-      heroX: HERO_X,
-      heroY: HERO_Y,
-      heroHpPct: this.heroMaxHp > 0 ? this.heroHp / this.heroMaxHp : 1,
-      heroHp: Math.ceil(this.heroHp),
-      heroMaxHp: this.heroMaxHp,
-      isPaused: false,
-      shield: this.shield,
-      phase: this.phase,
-      wave: this.wave,
-      zone: this.zone,
-      skillCooldowns: { ...this.skillCooldowns },
-      betweenWaveTimer: this.betweenWaveTimer,
-    }
   }
 }
