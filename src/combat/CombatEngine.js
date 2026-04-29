@@ -183,7 +183,7 @@ export class CombatEngine {
     this.enemies = []
     const layout = this.floorLayouts[floorIndex]
     const startRoom = layout.rooms.find(r => r.id === layout.startRoomId)
-    startRoom.state = 'active'
+    startRoom.state = 'cleared'  // start room has no enemies — immediately cleared
     this.currentRoomId = startRoom.id
     this.heroX = startRoom.x + startRoom.width / 2
     this.heroY = startRoom.y + startRoom.height / 2

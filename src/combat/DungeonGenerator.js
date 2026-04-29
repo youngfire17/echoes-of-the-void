@@ -112,60 +112,97 @@ export function generateFloor(floorNumber, totalFloors) {
     grid[bossRoom.id] = bossRoom
   }
 
-  // 3. Random walk critical path — move rightward col-by-col, drifting toward target row
+  // 3. Build critical path — alternating between moving right and adjusting row
+  // Never move diagonally (col AND row at same time) to avoid broken corridors
   const criticalPath = [start.id]
   let currentCol = 0
   let currentRow = startRow
   const targetRow = isFinalFloor ? bossRow : randomRow()
 
   while (currentCol < 4) {
-    currentCol++
+    const needsRowAdjust = currentRow !== targetRow && Math.random() < 0.5
 
-    // Drift toward target row with 60% probability
-    if (currentRow < targetRow && Math.random() < 0.6) currentRow++
-    else if (currentRow > targetRow && Math.random() < 0.6) currentRow--
-    currentRow = Math.max(0, Math.min(GRID_ROWS - 1, currentRow))
+    if (needsRowAdjust && currentCol > 0) {
+      // Adjust row at same column (vertical step)
+      const newRow = currentRow + (currentRow < targetRow ? 1 : -1)
+      const clampedRow = Math.max(0, Math.min(GRID_ROWS - 1, newRow))
+      const key = `${roomId(currentCol, clampedRow)}`
 
-    if (currentCol === 4 && isFinalFloor) {
-      // Connect current path tail to existing boss room (may be at a different row)
-      const prev = grid[criticalPath[criticalPath.length - 1]]
-      if (prev && !prev.neighborIds.includes(bossRoom.id)) {
-        prev.neighborIds.push(bossRoom.id)
-        bossRoom.neighborIds.push(prev.id)
+      if (!grid[key]) {
+        let type = 'standard'
+        const roll = Math.random()
+        if (roll < 0.20) type = 'elite'
+        else if (roll < 0.30) type = 'empty'
+        if (currentCol === 4 && isFinalFloor) type = 'boss'
+        const size = pickRoomSize(type)
+        const pos = roomWorldPos(currentCol, clampedRow, size)
+        grid[key] = {
+          id: roomId(currentCol, clampedRow),
+          type,
+          col: currentCol, row: clampedRow,
+          ...pos,
+          ...ROOM_SIZES[size],
+          neighborIds: [],
+          state: 'locked',
+          enemyPack: [],
+        }
       }
-      criticalPath.push(bossRoom.id)
-      break
-    }
 
-    const id = roomId(currentCol, currentRow)
-
-    if (!grid[id]) {
-      const roll = Math.random()
-      let type = 'standard'
-      if (roll < 0.20) type = 'elite'
-      else if (roll < 0.30) type = 'empty'
-
-      const size = pickRoomSize(type)
-      const pos = roomWorldPos(currentCol, currentRow, size)
-      grid[id] = {
-        id,
-        type,
-        col: currentCol, row: currentRow,
-        ...pos,
-        ...ROOM_SIZES[size],
-        neighborIds: [],
-        state: 'locked',
-        enemyPack: [],
+      const prevId = criticalPath[criticalPath.length - 1]
+      const prev = grid[prevId]
+      const curr = grid[key]
+      if (curr && !prev.neighborIds.includes(curr.id)) {
+        prev.neighborIds.push(curr.id)
+        curr.neighborIds.push(prev.id)
       }
-    }
+      if (curr) {
+        criticalPath.push(curr.id)
+        currentRow = clampedRow
+      }
+    } else {
+      // Move right (horizontal step)
+      currentCol++
+      currentRow = Math.max(0, Math.min(GRID_ROWS - 1, currentRow))
+      const key = roomId(currentCol, currentRow)
 
-    const prev = grid[criticalPath[criticalPath.length - 1]]
-    const curr = grid[id]
-    if (curr && prev && !prev.neighborIds.includes(curr.id)) {
-      prev.neighborIds.push(curr.id)
-      curr.neighborIds.push(prev.id)
+      if (currentCol === 4 && isFinalFloor) {
+        const prev = grid[criticalPath[criticalPath.length - 1]]
+        if (!prev.neighborIds.includes(bossRoom.id)) {
+          prev.neighborIds.push(bossRoom.id)
+          bossRoom.neighborIds.push(prev.id)
+        }
+        criticalPath.push(bossRoom.id)
+        break
+      }
+
+      if (!grid[key]) {
+        let type = 'standard'
+        const roll = Math.random()
+        if (roll < 0.20) type = 'elite'
+        else if (roll < 0.30) type = 'empty'
+        const size = pickRoomSize(type)
+        const pos = roomWorldPos(currentCol, currentRow, size)
+        grid[key] = {
+          id: key,
+          type,
+          col: currentCol, row: currentRow,
+          ...pos,
+          ...ROOM_SIZES[size],
+          neighborIds: [],
+          state: 'locked',
+          enemyPack: [],
+        }
+      }
+
+      const prevId = criticalPath[criticalPath.length - 1]
+      const prev = grid[prevId]
+      const curr = grid[key]
+      if (curr && !prev.neighborIds.includes(curr.id)) {
+        prev.neighborIds.push(curr.id)
+        curr.neighborIds.push(prev.id)
+      }
+      if (curr) criticalPath.push(curr.id)
     }
-    if (curr) criticalPath.push(curr.id)
   }
 
   // 4. Branch rooms — add 3-4 off critical path to reach 8-10 total rooms.
