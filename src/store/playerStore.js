@@ -87,4 +87,14 @@ export const usePlayerStore = create((set, get) => ({
   spendEchoes(amount) {
     set(state => ({ echoes: Math.max(0, state.echoes - amount) }))
   },
+
+  gold: 0,
+
+  addGold(amount) {
+    set(state => ({ gold: state.gold + Math.max(0, amount) }))
+  },
+
+  spendGold(amount) {
+    set(state => ({ gold: Math.max(0, state.gold - amount) }))
+  },
 }))
