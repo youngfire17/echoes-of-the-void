@@ -6,6 +6,7 @@ import { RunEndScreen } from './components/RunEndScreen'
 import { usePlayerStore } from './store/playerStore'
 import { useInventoryStore } from './store/inventoryStore'
 import { useMetaStore } from './store/metaStore'
+import { useShopStore } from './store/shopStore'
 import { load, save, buildSaveState } from './systems/SaveManager'
 import { calculateOfflineProgress } from './systems/OfflineSimulator'
 
@@ -25,6 +26,7 @@ export default function App() {
 
     // Restore player store
     if (typeof saved.echoes === 'number') usePlayerStore.setState({ echoes: saved.echoes })
+    if (typeof saved.gold === 'number') usePlayerStore.setState({ gold: saved.gold })
     if (saved.equippedGear) {
       Object.entries(saved.equippedGear).forEach(([slot, item]) => {
         if (item) usePlayerStore.getState().equipItem(item)
@@ -41,17 +43,13 @@ export default function App() {
     if (saved.stash) {
       useInventoryStore.setState({ stash: saved.stash })
     }
+    if (saved.shopStock && saved.shopStock.length > 0) {
+      useShopStore.setState({ stock: saved.shopStock })
+    }
 
-    // Restore meta store state by reconstructing the arrays
-    if (saved.purchasedNodeIds) {
-      saved.purchasedNodeIds.forEach(nodeId => {
-        // Directly purchase without echoes check since we're restoring a save
-        useMetaStore.setState(state => ({
-          purchasedNodeIds: state.purchasedNodeIds.includes(nodeId)
-            ? state.purchasedNodeIds
-            : [...state.purchasedNodeIds, nodeId]
-        }))
-      })
+    // Restore meta store state
+    if (saved.nodeLevels) {
+      useMetaStore.setState({ nodeLevels: saved.nodeLevels })
     }
     if (saved.unlockedZones) {
       useMetaStore.setState({ unlockedZones: saved.unlockedZones })
@@ -68,6 +66,7 @@ export default function App() {
         const progress = calculateOfflineProgress(stats, 1, 1, elapsed)
         if (progress.wavesCleared > 0) {
           usePlayerStore.getState().addEchoes(progress.echoes)
+          usePlayerStore.getState().addGold(progress.gold)
           setOfflineReward(progress)
         }
       }
@@ -80,7 +79,8 @@ export default function App() {
       const state = buildSaveState(
         usePlayerStore.getState(),
         useInventoryStore.getState(),
-        useMetaStore.getState()
+        useMetaStore.getState(),
+        useShopStore.getState()
       )
       save(state)
     }, 30000)
@@ -94,7 +94,8 @@ export default function App() {
         const state = buildSaveState(
           usePlayerStore.getState(),
           useInventoryStore.getState(),
-          useMetaStore.getState()
+          useMetaStore.getState(),
+          useShopStore.getState()
         )
         save(state)
       }
@@ -108,13 +109,16 @@ export default function App() {
   }
 
   const handleRunEnd = (result) => {
+    usePlayerStore.getState().addGold(result.goldEarned || 0)
+    useShopStore.getState().refreshStock()
     setRunResult(result)
     setView('runend')
     // Save immediately after run ends
     const state = buildSaveState(
       usePlayerStore.getState(),
       useInventoryStore.getState(),
-      useMetaStore.getState()
+      useMetaStore.getState(),
+      useShopStore.getState()
     )
     save(state)
   }
@@ -134,7 +138,7 @@ export default function App() {
             Cleared {offlineReward.wavesCleared} waves while away
           </div>
           <div className="text-yellow-300">
-            +{offlineReward.echoes} Echoes
+            +{offlineReward.echoes} Echoes · +{offlineReward.gold} Gold
           </div>
           <button
             onClick={() => setOfflineReward(null)}
