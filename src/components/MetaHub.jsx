@@ -2,6 +2,7 @@
 import { CharacterPanel } from './CharacterPanel'
 import { InventoryPanel } from './InventoryPanel'
 import { VaultPanel } from './VaultPanel'
+import { BlacksmithPanel } from './BlacksmithPanel'
 
 export function MetaHub({ onStartRun }) {
   return (
@@ -21,10 +22,11 @@ export function MetaHub({ onStartRun }) {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <CharacterPanel />
           <InventoryPanel />
           <VaultPanel />
+          <BlacksmithPanel />
         </div>
 
         <p className="text-center text-gray-600 text-xs">
