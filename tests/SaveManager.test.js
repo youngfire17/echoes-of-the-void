@@ -17,7 +17,7 @@ describe('SaveManager', () => {
   beforeEach(() => localStorage.clear())
 
   it('saved state can be loaded back as equal object', () => {
-    const state = { version: SAVE_VERSION, echoes: 42, items: [{ id: 'item_1', slot: 'weapon' }] }
+    const state = { version: SAVE_VERSION, echoes: 42, gold: 100, nodeLevels: { hp_1: 2 }, items: [] }
     save(state)
     const loaded = load()
     expect(loaded).toEqual(state)

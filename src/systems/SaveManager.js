@@ -1,6 +1,6 @@
 const SAVE_KEY = 'echoes_of_the_void_save'
 
-export const SAVE_VERSION = 1
+export const SAVE_VERSION = 2
 
 export function save(state) {
   try {
@@ -32,19 +32,21 @@ export function clearSave() {
   localStorage.removeItem(SAVE_KEY)
 }
 
-export function buildSaveState(playerStore, inventoryStore, metaStore) {
+export function buildSaveState(playerStore, inventoryStore, metaStore, shopStore) {
   return {
     version: SAVE_VERSION,
     classId: playerStore.classId,
     echoes: playerStore.echoes,
+    gold: playerStore.gold,
     equippedGear: playerStore.equippedGear,
     activeSkillIds: playerStore.activeSkillIds,
     passiveSkillIds: playerStore.passiveSkillIds,
     inventory: inventoryStore.items,
     stash: inventoryStore.stash,
-    purchasedNodeIds: metaStore.purchasedNodeIds,
+    nodeLevels: metaStore.nodeLevels,
     unlockedZones: metaStore.unlockedZones,
     automationSettings: metaStore.automationSettings,
+    shopStock: shopStore?.stock ?? [],
     lastOfflineTimestamp: Date.now(),
   }
 }
