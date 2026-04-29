@@ -22,7 +22,7 @@ export function HUD({ snapshot, activeSkillIds, onFire, onPause, isPaused, echoe
           </div>
         </div>
         <div className="text-center min-w-[120px]">
-          <div className="text-gold-400 font-bold text-sm">{snapshot.zoneName || `Zone ${snapshot.zone || 1}`}</div>
+          <div className="text-gold-400 font-bold text-sm">{snapshot.zoneName || 'Zone 1'}</div>
           <div className="text-xs text-gray-400">
             Floor {snapshot.floor || 1}/{snapshot.totalFloors || 1}
           </div>
