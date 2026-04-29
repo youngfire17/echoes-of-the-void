@@ -4,22 +4,24 @@ import { create } from 'zustand'
 export const useRunStore = create((set, get) => ({
   isActive: false,
   zone: 1,
-  wave: 1,
-  phase: 'idle',
+  floor: 1,
+  totalFloors: 1,
+  clearedRooms: 0,
+  totalRooms: 0,
   currentHp: 0,
   enemies: [],
   pendingLoot: [],
   echoesEarned: 0,
   goldEarned: 0,
   isPaused: false,
-  betweenWaveTimer: 10,
 
   startRun(maxHp) {
     set({
       isActive: true,
-      zone: 1,
-      wave: 1,
-      phase: 'wave',
+      floor: 1,
+      totalFloors: 1,
+      clearedRooms: 0,
+      totalRooms: 0,
       currentHp: maxHp,
       enemies: [],
       pendingLoot: [],
@@ -30,11 +32,15 @@ export const useRunStore = create((set, get) => ({
   },
 
   endRun() {
-    set({ isActive: false, phase: 'ended' })
+    set({ isActive: false })
   },
 
-  setPhase(phase) {
-    set({ phase })
+  setFloor(floor, totalFloors) {
+    set({ floor, totalFloors })
+  },
+
+  setRoomProgress(clearedRooms, totalRooms) {
+    set({ clearedRooms, totalRooms })
   },
 
   setCurrentHp(hp) {
@@ -47,10 +53,6 @@ export const useRunStore = create((set, get) => ({
 
   clearPendingLoot() {
     set({ pendingLoot: [] })
-  },
-
-  advanceWave() {
-    set(state => ({ wave: state.wave + 1, phase: 'wave' }))
   },
 
   addEchoes(amount) {

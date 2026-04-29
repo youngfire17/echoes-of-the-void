@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { GameLoop } from '../combat/GameLoop'
 import { CombatEngine } from '../combat/CombatEngine'
 import { ArenaRenderer } from '../combat/ArenaRenderer'
+import { Camera } from '../combat/Camera'
 import { HUD } from './HUD'
 import { usePlayerStore } from '../store/playerStore'
 import { useRunStore } from '../store/runStore'
@@ -28,6 +29,7 @@ export function GameCanvas({ onRunEnd }) {
     const ctx = canvas.getContext('2d')
     const engine = new CombatEngine()
     const renderer = new ArenaRenderer(ctx)
+    const camera = new Camera(800, 500)
 
     engineRef.current = engine
 
@@ -41,18 +43,18 @@ export function GameCanvas({ onRunEnd }) {
       const { echoesEarned, goldEarned } = useRunStore.getState()
       usePlayerStore.getState().addEchoes(echoesEarned)
       runStore.endRun()
-      onRunEnd({ reason: 'death', echoesEarned, goldEarned, wave: snap.wave })
+      onRunEnd({ reason: 'death', echoesEarned, goldEarned, floor: snap.floor })
     })
 
     engine.on('run_complete', () => {
       const { echoesEarned, goldEarned } = useRunStore.getState()
       usePlayerStore.getState().addEchoes(echoesEarned)
       runStore.endRun()
-      onRunEnd({ reason: 'victory', echoesEarned, goldEarned, wave: 10 })
+      onRunEnd({ reason: 'victory', echoesEarned, goldEarned })
     })
 
-    engine.on('wave_cleared', ({ wave }) => {
-      runStore.setPhase('between')
+    engine.on('room_cleared', () => {
+      // progress tracked via engine snapshot
     })
 
     engine.on('loot_drop', (item) => {
@@ -88,7 +90,8 @@ export function GameCanvas({ onRunEnd }) {
       },
       () => {
         const snap = engine.getSnapshot()
-        renderer.render({ ...snap, isPaused: isPausedRef.current })
+        camera.follow(snap.heroX, snap.heroY, snap.dungeonBounds || { width: 800, height: 500 })
+        renderer.render({ ...snap, isPaused: isPausedRef.current }, camera)
       }
     )
 
@@ -118,8 +121,8 @@ export function GameCanvas({ onRunEnd }) {
   }, [handlePause])
 
   const snap = snapshot || {
-    heroHp: 0, heroMaxHp: 1, wave: 1, zone: 1,
-    phase: 'wave', skillCooldowns: {}, betweenWaveTimer: 10
+    heroHp: 0, heroMaxHp: 1, floor: 1, totalFloors: 1,
+    clearedRooms: 0, totalRooms: 0, skillCooldowns: {}
   }
 
   return (

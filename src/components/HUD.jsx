@@ -2,7 +2,7 @@
 import { AbilityBar } from './AbilityBar'
 
 export function HUD({ snapshot, activeSkillIds, onFire, onPause, isPaused, echoesEarned, goldEarned }) {
-  const { heroHp, heroMaxHp, wave, zone, phase, skillCooldowns, betweenWaveTimer } = snapshot
+  const { heroHp, heroMaxHp, skillCooldowns } = snapshot
   const hpPct = heroMaxHp > 0 ? heroHp / heroMaxHp : 1
   const hpColor = hpPct > 0.5 ? 'bg-green-500' : hpPct > 0.25 ? 'bg-yellow-500' : 'bg-red-500'
 
@@ -21,12 +21,13 @@ export function HUD({ snapshot, activeSkillIds, onFire, onPause, isPaused, echoe
             />
           </div>
         </div>
-        <div className="text-center min-w-[100px]">
-          <div className="text-gold-400 font-bold">Zone {zone}</div>
-          <div className="text-sm text-gray-400">
-            {phase === 'between'
-              ? `Wave ${wave} clear! (${Math.ceil(betweenWaveTimer)}s)`
-              : `Wave ${wave}/10`}
+        <div className="text-center min-w-[120px]">
+          <div className="text-gold-400 font-bold text-sm">{snapshot.zoneName || `Zone ${snapshot.zone || 1}`}</div>
+          <div className="text-xs text-gray-400">
+            Floor {snapshot.floor || 1}/{snapshot.totalFloors || 1}
+          </div>
+          <div className="text-xs text-gray-500">
+            {snapshot.clearedRooms || 0}/{snapshot.totalRooms || 0} rooms
           </div>
         </div>
         <button
