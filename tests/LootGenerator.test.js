@@ -53,3 +53,22 @@ describe('generateLoot', () => {
     expect(item).toHaveProperty('base')
   })
 })
+
+import { rerollItemAffixes } from '../src/systems/LootGenerator'
+
+describe('rerollItemAffixes', () => {
+  it('preserves slot, rarity, base, id and zone from the original item', () => {
+    const original = generateLoot(1, 'normal', 'rare')
+    const rerolled = rerollItemAffixes(original)
+    expect(rerolled.id).toBe(original.id)
+    expect(rerolled.slot).toBe(original.slot)
+    expect(rerolled.rarity).toBe(original.rarity)
+    expect(rerolled.zone).toBe(original.zone)
+  })
+
+  it('produces the same number of affixes as the original', () => {
+    const original = generateLoot(1, 'normal', 'rare')
+    const rerolled = rerollItemAffixes(original)
+    expect(rerolled.affixes.length).toBe(original.affixes.length)
+  })
+})

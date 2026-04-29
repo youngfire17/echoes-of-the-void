@@ -55,3 +55,9 @@ export function generateLoot(zone, enemyArchetype, forcedRarity = null) {
     name: `${rarity.charAt(0).toUpperCase() + rarity.slice(1)} ${base.name}`,
   }
 }
+
+export function rerollItemAffixes(item) {
+  const affixCount = RARITY_AFFIX_COUNT[item.rarity]
+  const affixes = rollAffixes(item.slot, item.rarity, affixCount)
+  return { ...item, affixes }
+}
