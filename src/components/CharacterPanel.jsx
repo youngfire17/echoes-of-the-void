@@ -3,7 +3,7 @@ import { usePlayerStore } from '../store/playerStore'
 import { CLASSES } from '../data/classes'
 
 export function CharacterPanel() {
-  const { classId, getStats, echoes } = usePlayerStore()
+  const { classId, getStats, echoes, gold } = usePlayerStore()
   const classData = CLASSES[classId]
   const stats = getStats()
 
@@ -29,7 +29,10 @@ export function CharacterPanel() {
           <div className="text-xs text-gray-400">{classData.description}</div>
         </div>
       </div>
-      <div className="text-yellow-400 text-sm font-semibold">⚡ {echoes} Echoes</div>
+      <div className="flex gap-3 text-sm font-semibold">
+        <span className="text-yellow-400">⚡ {echoes} Echoes</span>
+        <span className="text-yellow-200">💰 {gold}g</span>
+      </div>
       <hr className="border-gray-700" />
       <div className="space-y-1">
         {statRows.map(([label, value]) => (
